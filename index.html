@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="icon" href="icon.png" />
+  <link rel="stylesheet" href="style.css" />
+  <script src="script.js" defer></script>
+  <title>Harmonoquiz</title>
+  <style>
+    .music-btn {
+      position: fixed;
+      top: calc(1rem + env(safe-area-inset-top));
+      right: calc(1rem + env(safe-area-inset-right));
+      z-index: 2200;
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #397358;
+      color: #fff;
+      border: none;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+      cursor: pointer;
+      transition: transform .12s ease, background .12s ease;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .music-btn:active { transform: translateY(1px); }
+    .music-btn[aria-pressed="true"] { background: #2f6a55; }
+    
+    .music-toast {
+      position: fixed;
+      right: 1rem;
+      top: calc(1rem + 64px + env(safe-area-inset-top));
+      z-index: 2300;
+      background: rgba(0,0,0,0.75);
+      color: #fff;
+      padding: 0.6rem 0.9rem;
+      border-radius: 0.5rem;
+      font-size: 0.95rem;
+      display: none;
+    }
+
+    .music-toast.show { display: block; }
+  </style>
+</head>
+
+<body>
+  <!-- Audio element (no autoplay) -->
+  <audio id="bg-music" preload="auto" loop>
+    <source src="audio.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+  </audio>
+
+  <!-- Music toggle button -->
+  <button id="music-toggle" class="music-btn" aria-pressed="false" aria-label="Play background music" title="Play / Pause music">
+    <!-- Play icon (SVG) initially -->
+    <svg id="music-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      <path d="M5 3v18l15-9L5 3z" fill="currentColor"/>
+    </svg>
+  </button>
+
+  <div class="music-toast" id="music-toast">Tap the music button to start audio</div>
+
+  <main class="container">
+    <!-- Tutorial Section -->
+    <section id="tutorial-section">
+      <h1>Welcome to Harmonoquiz</h1>
+
+      <h2>What is a Harmonic Sequence?</h2>
+      <p>A harmonic sequence is a sequence of numbers where the reciprocal of each term forms an arithmetic sequence.</p>
+
+      <h2>How the Quiz Works</h2>
+      <p>You will be given a series of questions based on harmonic sequences. Each question will challenge you to identify the correct term in the sequence. The difficulty increases as you progress.</p>
+
+      <div class="button-group">
+        <!-- Keep your existing onclick if you have startTutorial() in script.js -->
+        <button id="credit-btn" onclick="window.location.href='credits.html'">About</button>
+        <button id="exit-tutorial-btn" onclick="startTutorial()">Start Game</button>
+        <button id="tutorial" onclick="window.location.href='tutorial.html'">Tutorial</button>
+      </div>
+    </section>
+
+    <!-- Difficulty Section -->
+    <section id="difficulty-selection" hidden>
+      <h2>Select Difficulty</h2>
+      <p id="Note"><em>Note: the time bar does not reset between questions.</em></p>
+      <div class="button-group">
+        <button onclick="startGame('easy')">Easy</button>
+        <button onclick="startGame('medium')">Medium</button>
+        <button onclick="startGame('hard')">Hard</button>
+        <button onclick="showCustomOptions()">Custom</button>
+      </div>
+    </section>
+
+    <!-- Custom Options -->
+    <section id="custom-options" hidden>
+      <h2>Custom Difficulty Settings</h2>
+      <label for="intensity">Sequence Intensity:</label>
+      <input type="number" id="intensity" min="1" max="10" value="1" inputmode="numeric">
+
+      <label for="timer-speed">Timer Speed (seconds):</label>
+      <input type="number" id="timer-speed" min="5" max="60" value="30" inputmode="numeric">
+
+      <button id="apply" onclick="startGame('custom')">Apply and Start</button>
+    </section>
+
+    <!-- In-Game Section -->
+    <section id="in-game" hidden>
+    <header class="top-section">
+        <h1>Maths Quiz Game</h1>
+        <div class="game-data">
+        <p>Question: <span id="Qno">0</span>/10</p>
+        <p>Score: <span id="score">0</span></p>
+        </div>
+        <div id="timer">
+        <div id="progress"></div>
+        </div>
+    </header>
+
+    <article class="question-card">
+        <h1 id="question">This is question</h1>
+    </article>
+
+    <h3>Choose the correct one:</h3>
+    <div class="answer-card">
+        <button>Option A</button>
+        <button>Option B</button>
+        <button>Option C</button>
+        <button>Option D</button>
+    </div>
+    </section>
+
+
+    <!-- End Game Section -->
+    <section id="end-game" hidden>
+    <h1>Game Over</h1>
+    <h2>Your total score:</h2>
+    <div id="final-score">0</div>
+    <p id="message">Better luck next time</p>
+    <button id="restart-btn">Go Back</button>
+    </section>
+
+  </main>
+
+  <script>
+    (function () {
+      const audio = document.getElementById('bg-music');
+      const musicBtn = document.getElementById('music-toggle');
+      const musicIcon = document.getElementById('music-icon');
+      const toast = document.getElementById('music-toast');
+
+      // SVG icons as strings (fallback to innerHTML replacement)
+      const playSVG = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M5 3v18l15-9L5 3z" fill="currentColor"/></svg>';
+      const pauseSVG = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path d="M6 5h4v14H6zM14 5h4v14h-4z" fill="currentColor"/></svg>';
+
+      // Ensure audio won't start unexpectedly (no autoplay attributes)
+      audio.pause();
+
+      async function tryPlay() {
+        try {
+          await audio.play();
+          musicBtn.setAttribute('aria-pressed', 'true');
+          musicBtn.setAttribute('aria-label', 'Pause background music');
+          musicBtn.innerHTML = pauseSVG;
+          toast.classList.remove('show');
+          return true;
+        } catch (err) {
+          // Play failed (browser policy) — show a small toast to prompt user
+          console.warn('Audio play failed:', err);
+          toast.textContent = 'Tap the music button to start audio';
+          toast.classList.add('show');
+          setTimeout(() => toast.classList.remove('show'), 2500);
+          return false;
+        }
+      }
+
+      function pauseMusic() {
+        audio.pause();
+        musicBtn.setAttribute('aria-pressed', 'false');
+        musicBtn.setAttribute('aria-label', 'Play background music');
+        musicBtn.innerHTML = playSVG;
+      }
+
+      // Toggle from the music button
+      musicBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        if (audio.paused) {
+          await tryPlay();
+        } else {
+          pauseMusic();
+        }
+      });
+
+      // Try to play when user clicks Start Game button (user gesture)
+      const startBtn = document.getElementById('exit-tutorial-btn');
+      if (startBtn) {
+        startBtn.addEventListener('click', async () => {
+          // Attempt to play — if browser allows (because this is a user gesture) it will start
+          await tryPlay();
+        });
+      }
+
+      // Optional: Pause music automatically on page visibility change (nice for mobile)
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden && !audio.paused) {
+          audio.pause();
+          musicBtn.innerHTML = playSVG;
+          musicBtn.setAttribute('aria-pressed', 'false');
+        }
+      });
+
+      // Initialize button appearance to play icon
+      musicBtn.innerHTML = playSVG;
+      musicBtn.setAttribute('aria-pressed', 'false');
+    })();
+  </script>
+</body>
+
+</html>
