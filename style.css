@@ -372,3 +372,10 @@ ol li {
   80% {opacity: 1;}
   100% {opacity: 0;}
 }
+
+.hero-image {
+  display: block;
+  margin: 0 auto 20px; /* centers the image and adds spacing below */
+  max-width: 200px;    /* adjust the size */
+  height: auto;
+}
